@@ -435,8 +435,28 @@ def read_document(engine, raw, source, emit=None, return_kind=False):
         # conflicting readings by majority vote.
         candidate = certificate_serial_candidate(words + other, image.width, image.height)
         confirmed = refine_registration(engine, image, [candidate]) if candidate else None
+        # Camera uploads often preserve a sideways texpasport. If the printed
+        # series is absent, inspect both upright views; never choose a number
+        # merely because it resembles a serial elsewhere in the document.
+        if not confirmed:
+            orientations = []
+            for angle in (90, 270):
+                rotated = image.rotate(angle, expand=True)
+                found, _ = engine(np.array(ImageOps.invert(rotated))[:, :, ::-1].copy())
+                rotated_words = []
+                for box, text, confidence in found or []:
+                    left, top = min(p[0] for p in box), min(p[1] for p in box)
+                    rotated_words.append(Word(text, confidence * 100, left, top,
+                        max(p[0] for p in box) - left, max(p[1] for p in box) - top))
+                found_candidate = certificate_serial_candidate(rotated_words, rotated.width, rotated.height)
+                if found_candidate:
+                    verified = refine_registration(engine, rotated, [found_candidate])
+                    if verified:
+                        orientations.append(verified)
+            if len(set(orientations)) == 1 and orientations:
+                confirmed = orientations[0]
         expected = normalize({'vehicle_registration': candidate.text})['vehicle_registration'] if candidate else None
-        values['vehicle_registration'] = confirmed if confirmed == expected else None
+        values['vehicle_registration'] = confirmed if confirmed and (not candidate or confirmed == expected) else None
     values = guard_identifiers(values)[0]
     return (values, source) if return_kind else values
 
