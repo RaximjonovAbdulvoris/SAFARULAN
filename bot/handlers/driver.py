@@ -481,14 +481,6 @@ async def _send_to_driver_group(context: ContextTypes.DEFAULT_TYPE):
     app_key = f"s{serial}"
     code = f"SF-{serial:06d}"
 
-    caption_main = (
-        f"📝 <b>WB SAFAR TAXI · {code}</b>\n\n"
-        f"👤 Foydalanuvchi: {user_link_html}\n"
-        f"🪪 Ism familiya: {h(d.get('name', '-'))}\n"
-        f"📞 Tel: {h(d.get('phone', '-'))}\n"
-        f"🚗 Mashina raqami: {h(d.get('car_plate', '-'))}"
-    )
-    caption_selfie = f"🤳 {h(d.get('name', '-'))} — selfie va litsenziya"
 
     main_album_ids = [
         d.get("passport_front"),
@@ -511,8 +503,6 @@ async def _send_to_driver_group(context: ContextTypes.DEFAULT_TYPE):
         main_media = [
             InputMediaPhoto(
                 media=fid,
-                caption=caption_main if i == 0 else None,
-                parse_mode=ParseMode.HTML if i == 0 else None,
             )
             for i, fid in enumerate(main_album_ids)
         ]
@@ -523,8 +513,6 @@ async def _send_to_driver_group(context: ContextTypes.DEFAULT_TYPE):
         selfie_media = [
             InputMediaPhoto(
                 media=fid,
-                caption=caption_selfie if i == 0 else None,
-                parse_mode=ParseMode.HTML if i == 0 else None,
             )
             for i, fid in enumerate(selfie_album_ids)
         ]
@@ -540,7 +528,9 @@ async def _send_to_driver_group(context: ContextTypes.DEFAULT_TYPE):
             "username": username,
         }
 
-        control_text = f"📋 <b>Ariza {code}</b>\n👤 Arizachi: {user_link_html}\n\n🔎 Hujjatlar o‘qilmoqda. Natijani operator tekshiradi."
+        from bot.operator_card import render_card
+        control_text = render_card(code, user_link_html, d.get('name'),
+                                   d.get('phone'), d.get('car_plate'))
         kb_msg = await context.bot.send_message(
             chat_id=chat_id,
             text=control_text,
@@ -563,6 +553,9 @@ async def _send_to_driver_group(context: ContextTypes.DEFAULT_TYPE):
             "applicant_name": d.get("name") or full_name,
             "code": code,
             "display_text": control_text,
+            "applicant_link": user_link_html,
+            "entered_name": d.get('name'),
+            "phone": d.get('phone'),
             "media_albums": albums,
             "ocr_sources": ocr_data,
             "car_plate": d.get("car_plate"),
